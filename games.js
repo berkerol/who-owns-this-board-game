@@ -5,9 +5,6 @@
 window.GAMES = [
   { id: 6249, name: "Alhambra", owners: ["berkerol"] },
   { id: 230802, name: "Azul", owners: ["berkerol"] },
-  { id: 290448, name: "BGG Game 290448", owners: ["berkerol"] },
-  { id: 29416, name: "BGG Game 29416", owners: ["berkerol"] },
-  { id: 33261, name: "BGG Game 33261", owners: ["berkerol"] },
   { id: 295947, name: "Cascadia", owners: ["berkerol"] },
   { id: 124361, name: "Concordia", owners: ["berkerol"] },
   { id: 36218, name: "Dominion", owners: ["berkerol"] },
