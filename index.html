@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>BGG Owners Search</title>
+    <style>
+      html, body { height: 100%; margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
+      .wrap { min-height: 100%; display: grid; place-items: center; padding: 24px; }
+      .card { width: min(720px, 100%); }
+      .title { text-align: center; margin: 0 0 14px; font-size: 20px; font-weight: 600; }
+      .row { display: flex; gap: 10px; }
+      input[type="text"] {
+        flex: 1;
+        font-size: 16px;
+        padding: 12px 14px;
+        border: 1px solid #ccc;
+        border-radius: 10px;
+        outline: none;
+      }
+      input[type="text"]:focus { border-color: #666; }
+      button {
+        font-size: 14px;
+        padding: 12px 14px;
+        border: 1px solid #ccc;
+        border-radius: 10px;
+        background: #fff;
+        cursor: pointer;
+      }
+      button:hover { border-color: #999; }
+      .hint { text-align: center; color: #666; margin: 10px 0 0; font-size: 13px; }
+      .result { margin-top: 18px; }
+      .gameName { font-weight: 600; margin: 0 0 10px; }
+      ul { margin: 0; padding-left: 18px; }
+      li { margin: 6px 0; }
+      .muted { color: #666; font-size: 13px; }
+      a { color: inherit; text-decoration: underline; }
+    </style>
+  </head>
+
+  <body>
+    <div class="wrap">
+      <div class="card">
+        <p class="title">Search a game</p>
+
+        <div class="row">
+          <input id="q" type="text" list="gamesList" placeholder="Type a game name…" autocomplete="off" />
+          <button id="clearBtn" type="button">Clear</button>
+        </div>
+
+        <datalist id="gamesList"></datalist>
+
+        <p class="hint">Pick a suggestion from the dropdown, then owners will appear below.</p>
+
+        <div id="result" class="result"></div>
+      </div>
+    </div>
+
+    <!-- Your data files -->
+    <script src="./games.js"></script>
+    <script src="./users.js"></script>
+
+    <script>
+      // users.js defines: const users = { 'bggUsername': 'WhatsApp Name', ... }
+      // games.js defines: window.GAMES = [{ id, name, owners: [...] }, ...]
+
+      const input = document.getElementById("q");
+      const dl = document.getElementById("gamesList");
+      const result = document.getElementById("result");
+      const clearBtn = document.getElementById("clearBtn");
+
+      // Map game name -> game object. (Name collisions ignored as requested.)
+      const nameToGame = new Map();
+
+      function escapeHtml(s) {
+        return String(s).replace(/[&<>"']/g, c => ({
+          "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+        }[c]));
+      }
+
+      function buildDatalist() {
+        const games = window.GAMES || [];
+        const frag = document.createDocumentFragment();
+
+        for (const g of games) {
+          if (!g || !g.name) continue;
+          if (!nameToGame.has(g.name)) nameToGame.set(g.name, g);
+
+          const opt = document.createElement("option");
+          opt.value = g.name;
+          frag.appendChild(opt);
+        }
+        dl.appendChild(frag);
+      }
+
+      function renderOwners(game) {
+        const owners = (game.owners || []).slice().sort((a, b) => a.localeCompare(b));
+
+        const rows = owners.map(u => {
+          const wa = (typeof users === "object" && users && users[u]) ? users[u] : null;
+          const waLabel = wa ? escapeHtml(wa) : "<span class='muted'>(unknown)</span>";
+          const bgg = escapeHtml(u);
+
+          // Clickable: open BGG user profile
+          const profileUrl = `https://boardgamegeek.com/user/${encodeURIComponent(u)}`;
+          return `<li>${waLabel} <span class="muted">(<a href="${profileUrl}" target="_blank" rel="noopener noreferrer">${bgg}</a>)</span></li>`;
+        }).join("");
+
+        result.innerHTML = `
+          <p class="gameName">${escapeHtml(game.name)}</p>
+          ${owners.length ? `<ul>${rows}</ul>` : `<p class="muted">No owners listed.</p>`}
+        `;
+      }
+
+      function clearUI() {
+        input.value = "";
+        result.innerHTML = "";
+        input.focus();
+      }
+
+      buildDatalist();
+
+      input.addEventListener("change", () => {
+        const name = input.value.trim();
+        const game = nameToGame.get(name);
+        if (!game) {
+          result.innerHTML = `<p class="muted">Pick a game from the suggestions.</p>`;
+          return;
+        }
+        renderOwners(game);
+      });
+
+      clearBtn.addEventListener("click", clearUI);
+    </script>
+  </body>
+</html>
