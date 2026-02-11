@@ -68,13 +68,16 @@
       const dl = document.getElementById("gamesList");
       const result = document.getElementById("result");
       const clearBtn = document.getElementById("clearBtn");
-
-      // Map game name -> game object. (Name collisions ignored as requested.)
+    
       const nameToGame = new Map();
 
       function escapeHtml(s) {
         return String(s).replace(/[&<>"']/g, c => ({
-          "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+          "&": "&amp;",
+          "<": "&lt;",
+          ">": "&gt;",
+          '"': "&quot;",
+          "'": "&#39;"
         }[c]));
       }
 
@@ -84,26 +87,38 @@
 
         for (const g of games) {
           if (!g || !g.name) continue;
-          if (!nameToGame.has(g.name)) nameToGame.set(g.name, g);
-
+    
+          if (!nameToGame.has(g.name)) {
+            nameToGame.set(g.name, g);
+          }
+    
           const opt = document.createElement("option");
           opt.value = g.name;
           frag.appendChild(opt);
         }
+    
         dl.appendChild(frag);
       }
 
       function renderOwners(game) {
-        const owners = (game.owners || []).slice().sort((a, b) => a.localeCompare(b));
-
+        const owners = (game.owners || [])
+          .slice()
+          .sort((a, b) => a.localeCompare(b));
+    
         const rows = owners.map(u => {
           const wa = (typeof users === "object" && users && users[u]) ? users[u] : null;
           const waLabel = wa ? escapeHtml(wa) : "<span class='muted'>(unknown)</span>";
           const bgg = escapeHtml(u);
-
-          // Clickable: open BGG user profile
           const profileUrl = `https://boardgamegeek.com/user/${encodeURIComponent(u)}`;
-          return `<li>${waLabel} <span class="muted">(<a href="${profileUrl}" target="_blank" rel="noopener noreferrer">${bgg}</a>)</span></li>`;
+    
+          return `
+            <li>
+              ${waLabel}
+              <span class="muted">
+                (<a href="${profileUrl}" target="_blank" rel="noopener noreferrer">${bgg}</a>)
+              </span>
+            </li>
+          `;
         }).join("");
 
         result.innerHTML = `
@@ -111,7 +126,16 @@
           ${owners.length ? `<ul>${rows}</ul>` : `<p class="muted">No owners listed.</p>`}
         `;
       }
-
+    
+      function tryRenderFromValue() {
+        const name = input.value.trim();
+        const game = nameToGame.get(name);
+    
+        if (game) {
+          renderOwners(game);
+        }
+      }
+    
       function clearUI() {
         input.value = "";
         result.innerHTML = "";
@@ -119,17 +143,13 @@
       }
 
       buildDatalist();
-
-      input.addEventListener("change", () => {
-        const name = input.value.trim();
-        const game = nameToGame.get(name);
-        if (!game) {
-          result.innerHTML = `<p class="muted">Pick a game from the suggestions.</p>`;
-          return;
-        }
-        renderOwners(game);
-      });
-
+    
+      // 🔹 Firefox fix: render immediately when value matches a suggestion
+      input.addEventListener("input", tryRenderFromValue);
+    
+      // 🔹 Fallback for browsers that commit on change
+      input.addEventListener("change", tryRenderFromValue);
+    
       clearBtn.addEventListener("click", clearUI);
     </script>
   </body>
