@@ -16,11 +16,15 @@ Auth:
 
 BGG API:
 - /xmlapi2/collection?username=...&own=1&subtype=boardgame
-- /xmlapi2/thing?id=... to resolve canonical (primary) names
+- /xmlapi2/thing?id=...&type=boardgame to resolve canonical (primary) names
 
 Determinism:
 - games sorted by (name, id)
 - owners sorted
+
+Important filtering:
+- Any IDs returned by /collection that do NOT resolve via /thing with type=boardgame
+  are silently dropped (prevents expansions/accessories/etc. from leaking in).
 """
 
 from __future__ import annotations
@@ -54,8 +58,10 @@ _USER_ENTRY_RE = re.compile(
     re.VERBOSE | re.DOTALL,
 )
 
+
 def _unescape_js_string(s: str) -> str:
     return bytes(s, "utf-8").decode("unicode_escape")
+
 
 def parse_bgg_usernames_from_users_js(path: str) -> List[str]:
     """
@@ -91,7 +97,7 @@ def http_get_xml_text(
     timeout: int = 30,
     max_attempts: int = 25,
     backoff_seconds: float = 2.0,
-    user_agent: str = "bgg-games-js-generator/1.3",
+    user_agent: str = "bgg-games-js-generator/1.4",
 ) -> str:
     headers = {
         "User-Agent": user_agent,
@@ -145,6 +151,10 @@ def fetch_owned_game_ids_for_user(username: str, token: str) -> List[int]:
 
 
 def fetch_primary_names(ids: List[int], token: str, *, chunk_size: int = 20) -> Dict[int, str]:
+    """
+    Fetch canonical (primary) names for game ids using /thing, restricted to boardgames.
+    Returns: { game_id: primary_name }
+    """
     out: Dict[int, str] = {}
 
     for ch in chunked(ids, chunk_size):
@@ -170,7 +180,7 @@ def fetch_primary_names(ids: List[int], token: str, *, chunk_size: int = 20) -> 
             if primary:
                 out[gid] = primary
 
-        time.sleep(0.2)
+        time.sleep(0.2)  # be gentle
 
     return out
 
@@ -182,10 +192,10 @@ def fetch_primary_names(ids: List[int], token: str, *, chunk_size: int = 20) -> 
 def js_escape(s: str) -> str:
     return (
         s.replace("\\", "\\\\")
-         .replace('"', '\\"')
-         .replace("\n", "\\n")
-         .replace("\r", "\\r")
-         .replace("\t", "\\t")
+        .replace('"', '\\"')
+        .replace("\n", "\\n")
+        .replace("\r", "\\r")
+        .replace("\t", "\\t")
     )
 
 
@@ -238,23 +248,21 @@ def main() -> int:
         time.sleep(0.3)
 
     all_ids = sorted(game_to_owners.keys())
-    print(f"Resolving canonical names for {len(all_ids)} games…", file=sys.stderr)
     id_to_name = fetch_primary_names(all_ids, token)
 
+    # IMPORTANT: silently drop any IDs that did not resolve as type=boardgame
     games_out: List[dict] = []
-    missing = 0
     for gid in all_ids:
         name = id_to_name.get(gid)
         if not name:
-            missing += 1
-            name = f"BGG Game {gid}"
+            continue
         owners_sorted = sorted(game_to_owners[gid])
         games_out.append({"id": gid, "name": name, "owners": owners_sorted})
 
     games_out.sort(key=lambda g: (g["name"].casefold(), g["id"]))
 
     write_games_js(out_path, games_out)
-    print(f"Wrote games.js with {len(games_out)} games (missing names: {missing}).", file=sys.stderr)
+    print(f"Wrote games.js with {len(games_out)} games.", file=sys.stderr)
     return 0
 
 
